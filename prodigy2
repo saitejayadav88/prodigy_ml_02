@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Segmentation - K-means Clustering</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 30px;
+        }
+
+        .controls {
+            background: rgba(255,255,255,0.1);
+            padding: 25px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            height: fit-content;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+        }
+
+        .panel {
+            background: rgba(255,255,255,0.1);
+            padding: 25px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .panel h2 {
+            margin-top: 0;
+            color: #fff;
+            font-size: 1.3em;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.9);
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+
+        .btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        .btn.primary {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+        }
+
+        .btn.primary:hover {
+            background: linear-gradient(45deg, #ff5252, #d63031);
+        }
+
+        .chart-container {
+            height: 500px;
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .results {
+            background: rgba(0,0,0,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .cluster-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .cluster-card {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid;
+        }
+
+        .cluster-0 { border-left-color: #ff6b6b; }
+        .cluster-1 { border-left-color: #4ecdc4; }
+        .cluster-2 { border-left-color: #45b7d1; }
+        .cluster-3 { border-left-color: #96ceb4; }
+        .cluster-4 { border-left-color: #ffeaa7; }
+
+        .cluster-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }
+
+        .iteration-info {
+            background: rgba(0,0,0,0.2);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+</head>
+<body>
+    <div class="header">
+        <h1>🛍️ Customer Segmentation</h1>
+        <p>K-means Clustering Algorithm for Retail Purchase Analysis</p>
+    </div>
+
+    <div class="container">
+        <div class="controls">
+            <h2>📊 Algorithm Settings</h2>
+            
+            <div class="input-group">
+                <label>Number of Clusters (K)</label>
+                <input type="number" id="numClusters" min="2" max="8" value="4">
+            </div>
+            
+            <div class="input-group">
+                <label>Max Iterations</label>
+                <input type="number" id="maxIterations" min="10" max="200" value="100">
+            </div>
+            
+            <div class="input-group">
+                <label>Dataset Size</label>
+                <select id="datasetSize">
+                    <option value="500">500 customers</option>
+                    <option value="1000" selected>1,000 customers</option>
+                    <option value="2000">2,000 customers</option>
+                </select>
+            </div>
+            
+            <div class="input-group">
+                <label>Features to Use</label>
+                <div style="margin-top: 5px;">
+                    <label style="display: flex; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" id="useSpending" checked style="width: auto; margin-right: 8px;">
+                        Annual Spending
+                    </label>
+                    <label style="display: flex; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" id="useFrequency" checked style="width: auto; margin-right: 8px;">
+                        Purchase Frequency
+                    </label>
+                    <label style="display: flex; align-items: center; margin-bottom: 5px;">
+                        <input type="checkbox" id="useAge" checked style="width: auto; margin-right: 8px;">
+                        Customer Age
+                    </label>
+                    <label style="display: flex; align-items: center;">
+                        <input type="checkbox" id="useIncome" checked style="width: auto; margin-right: 8px;">
+                        Annual Income
+                    </label>
+                </div>
+            </div>
+            
+            <button class="btn primary" onclick="runKMeans()">Generate Data & Run K-means</button>
+            <button class="btn" onclick="findOptimalK()">Find Optimal K (Elbow Method)</button>
+            
+            <div id="algorithmInfo" class="results" style="display: none;">
+                <div id="iterationInfo"></div>
+                <div id="convergenceInfo"></div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="panel">
+                <h2>📈 Clustering Visualization</h2>
+                <div class="chart-container">
+                    <canvas id="clusterChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2>👥 Customer Segments</h2>
+                <div id="clusterResults" class="cluster-info">
+                    <div class="loading">Run K-means clustering to see customer segments</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let dataset = null;
+        let clusters = null;
+        let chart = null;
+
+        // Generate realistic customer data
+        function generateCustomerData(size) {
+            const data = [];
+            
+            // Define customer archetypes for more realistic clustering
+            const archetypes = [
+                { spending: [500, 2000], frequency: [2, 8], age: [18, 35], income: [25000, 50000] }, // Young budget
+                { spending: [2000, 5000], frequency: [8, 20], age: [25, 45], income: [40000, 80000] }, // Middle class frequent
+                { spending: [5000, 15000], frequency: [12, 30], age: [35, 55], income: [70000, 150000] }, // High value
+                { spending: [300, 1000], frequency: [1, 4], age: [55, 75], income: [20000, 60000] } // Senior occasional
+            ];
+            
+            for (let i = 0; i < size; i++) {
+                const archetype = archetypes[Math.floor(Math.random() * archetypes.length)];
+                
+                const customer = {
+                    id: i + 1,
+                    annualSpending: Math.round(archetype.spending[0] + Math.random() * (archetype.spending[1] - archetype.spending[0])),
+                    purchaseFrequency: Math.round(archetype.frequency[0] + Math.random() * (archetype.frequency[1] - archetype.frequency[0])),
+                    age: Math.round(archetype.age[0] + Math.random() * (archetype.age[1] - archetype.age[0])),
+                    annualIncome: Math.round(archetype.income[0] + Math.random() * (archetype.income[1] - archetype.income[0]))
+                };
+                
+                data.push(customer);
+            }
+            
+            return data;
+        }
+
+        // K-means clustering implementation
+        function kMeansCluster(data, k, maxIterations = 100) {
+            const features = getSelectedFeatures();
+            const points = data.map(customer => features.map(feature => customer[feature]));
+            
+            // Normalize features
+            const normalized = normalizeData(points);
+            const n = normalized.length;
+            const dimensions = normalized[0].length;
+            
+            // Initialize centroids randomly
+            let centroids = [];
+            for (let i = 0; i < k; i++) {
+                centroids.push(normalized[Math.floor(Math.random() * n)].slice());
+            }
+            
+            let assignments = new Array(n);
+            let iterations = 0;
+            let converged = false;
+            
+            while (iterations < maxIterations && !converged) {
+                // Assign points to nearest centroid
+                const newAssignments = new Array(n);
+                for (let i = 0; i < n; i++) {
+                    let minDistance = Infinity;
+                    let closestCentroid = 0;
+                    
+                    for (let j = 0; j < k; j++) {
+                        const distance = euclideanDistance(normalized[i], centroids[j]);
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestCentroid = j;
+                        }
+                    }
+                    
+                    newAssignments[i] = closestCentroid;
+                }
+                
+                // Check for convergence
+                converged = assignments.every((val, i) => val === newAssignments[i]);
+                assignments = newAssignments;
+                
+                // Update centroids
+                for (let j = 0; j < k; j++) {
+                    const clusterPoints = [];
+                    for (let i = 0; i < n; i++) {
+                        if (assignments[i] === j) {
+                            clusterPoints.push(normalized[i]);
+                        }
+                    }
+                    
+                    if (clusterPoints.length > 0) {
+                        for (let d = 0; d < dimensions; d++) {
+                            centroids[j][d] = clusterPoints.reduce((sum, point) => sum + point[d], 0) / clusterPoints.length;
+                        }
+                    }
+                }
+                
+                iterations++;
+            }
+            
+            // Calculate WCSS (Within-Cluster Sum of Squares)
+            let wcss = 0;
+            for (let i = 0; i < n; i++) {
+                const centroid = centroids[assignments[i]];
+                wcss += Math.pow(euclideanDistance(normalized[i], centroid), 2);
+            }
+            
+            return {
+                assignments,
+                centroids,
+                iterations,
+                converged,
+                wcss,
+                features
+            };
+        }
+
+        function normalizeData(data) {
+            const dimensions = data[0].length;
+            const mins = new Array(dimensions).fill(Infinity);
+            const maxs = new Array(dimensions).fill(-Infinity);
+            
+            // Find min and max for each dimension
+            data.forEach(point => {
+                point.forEach((val, i) => {
+                    mins[i] = Math.min(mins[i], val);
+                    maxs[i] = Math.max(maxs[i], val);
+                });
+            });
+            
+            // Normalize to [0, 1]
+            return data.map(point => 
+                point.map((val, i) => (val - mins[i]) / (maxs[i] - mins[i]) || 0)
+            );
+        }
+
+        function euclideanDistance(point1, point2) {
+            return Math.sqrt(
+                point1.reduce((sum, val, i) => sum + Math.pow(val - point2[i], 2), 0)
+            );
+        }
+
+        function getSelectedFeatures() {
+            const features = [];
+            if (document.getElementById('useSpending').checked) features.push('annualSpending');
+            if (document.getElementById('useFrequency').checked) features.push('purchaseFrequency');
+            if (document.getElementById('useAge').checked) features.push('age');
+            if (document.getElementById('useIncome').checked) features.push('annualIncome');
+            return features;
+        }
+
+        function runKMeans() {
+            const size = parseInt(document.getElementById('datasetSize').value);
+            const k = parseInt(document.getElementById('numClusters').value);
+            const maxIter = parseInt(document.getElementById('maxIterations').value);
+            const features = getSelectedFeatures();
+            
+            if (features.length < 2) {
+                alert('Please select at least 2 features for clustering!');
+                return;
+            }
+            
+            // Generate data
+            dataset = generateCustomerData(size);
+            
+            // Run clustering
+            clusters = kMeansCluster(dataset, k, maxIter);
+            
+            // Update UI
+            updateAlgorithmInfo();
+            createClusterVisualization();
+            displayClusterResults();
+        }
+
+        function updateAlgorithmInfo() {
+            document.getElementById('algorithmInfo').style.display = 'block';
+            document.getElementById('iterationInfo').innerHTML = `
+                <strong>Algorithm Status:</strong><br>
+                Iterations: ${clusters.iterations}<br>
+                Converged: ${clusters.converged ? 'Yes' : 'No'}<br>
+                WCSS: ${clusters.wcss.toFixed(2)}
+            `;
+            
+            document.getElementById('convergenceInfo').innerHTML = `
+                <strong>Features Used:</strong><br>
+                ${clusters.features.join(', ')}
+            `;
+        }
+
+        function createClusterVisualization() {
+            const ctx = document.getElementById('clusterChart').getContext('2d');
+            
+            if (chart) {
+                chart.destroy();
+            }
+            
+            const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7', '#dda0dd', '#98d8c8', '#f7dc6f'];
+            
+            const datasets = [];
+            const k = parseInt(document.getElementById('numClusters').value);
+            
+            // Create dataset for each cluster
+            for (let i = 0; i < k; i++) {
+                const clusterData = dataset
+                    .filter((_, index) => clusters.assignments[index] === i)
+                    .map(customer => ({
+                        x: customer.annualSpending,
+                        y: customer.purchaseFrequency
+                    }));
+                
+                datasets.push({
+                    label: `Cluster ${i + 1}`,
+                    data: clusterData,
+                    backgroundColor: colors[i] + '80',
+                    borderColor: colors[i],
+                    borderWidth: 1
+                });
+            }
+            
+            chart = new Chart(ctx, {
+                type: 'scatter',
+                data: { datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Customer Clusters: Annual Spending vs Purchase Frequency',
+                            color: '#333'
+                        },
+                        legend: {
+                            labels: { color: '#333' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Annual Spending ($)',
+                                color: '#333'
+                            },
+                            ticks: {
+                                color: '#333',
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Purchase Frequency (per year)',
+                                color: '#333'
+                            },
+                            ticks: { color: '#333' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function displayClusterResults() {
+            const k = parseInt(document.getElementById('numClusters').value);
+            const clusterData = [];
+            
+            for (let i = 0; i < k; i++) {
+                const clusterCustomers = dataset.filter((_, index) => clusters.assignments[index] === i);
+                
+                const avgSpending = clusterCustomers.reduce((sum, c) => sum + c.annualSpending, 0) / clusterCustomers.length;
+                const avgFrequency = clusterCustomers.reduce((sum, c) => sum + c.purchaseFrequency, 0) / clusterCustomers.length;
+                const avgAge = clusterCustomers.reduce((sum, c) => sum + c.age, 0) / clusterCustomers.length;
+                const avgIncome = clusterCustomers.reduce((sum, c) => sum + c.annualIncome, 0) / clusterCustomers.length;
+                
+                // Determine segment characteristics
+                let segmentName = 'Segment ' + (i + 1);
+                let description = '';
+                
+                if (avgSpending > 4000 && avgFrequency > 15) {
+                    segmentName = 'VIP Customers';
+                    description = 'High-value, frequent shoppers';
+                } else if (avgSpending < 1500 && avgFrequency < 6) {
+                    segmentName = 'Occasional Shoppers';
+                    description = 'Low spending, infrequent purchases';
+                } else if (avgAge > 50) {
+                    segmentName = 'Senior Customers';
+                    description = 'Mature demographic segment';
+                } else if (avgAge < 35 && avgIncome < 50000) {
+                    segmentName = 'Young Budget-Conscious';
+                    description = 'Price-sensitive younger customers';
+                }
+                
+                clusterData.push({
+                    id: i,
+                    name: segmentName,
+                    description: description,
+                    size: clusterCustomers.length,
+                    avgSpending: avgSpending,
+                    avgFrequency: avgFrequency,
+                    avgAge: avgAge,
+                    avgIncome: avgIncome
+                });
+            }
+            
+            const html = clusterData.map(cluster => `
+                <div class="cluster-card cluster-${cluster.id}">
+                    <div class="cluster-title">${cluster.name}</div>
+                    <div style="font-size: 0.9em; margin-bottom: 10px; opacity: 0.8;">${cluster.description}</div>
+                    <div class="metric">
+                        <span>Size:</span>
+                        <span>${cluster.size} customers (${((cluster.size / dataset.length) * 100).toFixed(1)}%)</span>
+                    </div>
+                    <div class="metric">
+                        <span>Avg Spending:</span>
+                        <span>$${cluster.avgSpending.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                    </div>
+                    <div class="metric">
+                        <span>Avg Frequency:</span>
+                        <span>${cluster.avgFrequency.toFixed(1)} purchases/year</span>
+                    </div>
+                    <div class="metric">
+                        <span>Avg Age:</span>
+                        <span>${cluster.avgAge.toFixed(1)} years</span>
+                    </div>
+                    <div class="metric">
+                        <span>Avg Income:</span>
+                        <span>$${cluster.avgIncome.toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                    </div>
+                </div>
+            `).join('');
+            
+            document.getElementById('clusterResults').innerHTML = html;
+        }
+
+        function findOptimalK() {
+            const features = getSelectedFeatures();
+            if (features.length < 2) {
+                alert('Please select at least 2 features for clustering!');
+                return;
+            }
+            
+            const size = parseInt(document.getElementById('datasetSize').value);
+            dataset = generateCustomerData(size);
+            
+            const wcssValues = [];
+            const maxK = 8;
+            
+            // Calculate WCSS for different k values
+            for (let k = 1; k <= maxK; k++) {
+                const result = kMeansCluster(dataset, k, 50);
+                wcssValues.push(result.wcss);
+            }
+            
+            // Create elbow plot
+            const ctx = document.getElementById('clusterChart').getContext('2d');
+            
+            if (chart) {
+                chart.destroy();
+            }
+            
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: maxK}, (_, i) => i + 1),
+                    datasets: [{
+                        label: 'Within-Cluster Sum of Squares (WCSS)',
+                        data: wcssValues,
+                        borderColor: '#ff6b6b',
+                        backgroundColor: '#ff6b6b20',
+                        borderWidth: 3,
+                        pointRadius: 6,
+                        pointBackgroundColor: '#ff6b6b',
+                        tension: 0.2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Elbow Method: Finding Optimal Number of Clusters',
+                            color: '#333'
+                        },
+                        legend: {
+                            labels: { color: '#333' }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Number of Clusters (K)',
+                                color: '#333'
+                            },
+                            ticks: { color: '#333' }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'WCSS',
+                                color: '#333'
+                            },
+                            ticks: { color: '#333' }
+                        }
+                    }
+                }
+            });
+            
+            // Find suggested optimal K (simplified elbow detection)
+            let optimalK = 3;
+            let maxImprovement = 0;
+            for (let i = 1; i < wcssValues.length - 1; i++) {
+                const improvement = wcssValues[i-1] - wcssValues[i];
+                const nextImprovement = wcssValues[i] - wcssValues[i+1];
+                const ratio = improvement / nextImprovement;
+                if (ratio > maxImprovement) {
+                    maxImprovement = ratio;
+                    optimalK = i + 1;
+                }
+            }
+            
+            document.getElementById('clusterResults').innerHTML = `
+                <div class="loading">
+                    <strong>Elbow Method Results:</strong><br><br>
+                    Suggested optimal K: <strong>${optimalK}</strong><br><br>
+                    The elbow method suggests ${optimalK} clusters based on the point where adding more clusters doesn't significantly reduce WCSS.<br><br>
+                    <em>Set K to ${optimalK} and run clustering to see the results!</em>
+                </div>
+            `;
+            
+            document.getElementById('numClusters').value = optimalK;
+        }
+
+        // Initialize with sample data
+        setTimeout(() => {
+            runKMeans();
+        }, 500);
+    </script>
+</body>
+</html>
